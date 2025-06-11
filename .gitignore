@@ -1,0 +1,46 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+celerybeat-schedule
+db.sqlite3
+media/
+static/
+
+# IDEs
+.idea/
+.vscode/
+
+# Python
+.Python
+.env
+venv/
+env/
+pip-log.txt
+pip-delete-this-arg.txt
+*.egg-info/
+.coverage
+.tox/
+.pytest_cache/
+
+# Docker
+docker-compose.override.yml  # Often used for local overrides, shouldn't be committed
+.dockerignore
+!docker-compose.yml # Ensure this is NOT ignored if you want to commit your main compose file
+!Dockerfile # Ensure this is NOT ignored
+docker-compose.prod.yml # If you have a separate prod compose, might be ignored if deployment handles it
+build/
+
+# Celery
+*.celerybeat
+*.pid
+
+# Redis
+dump.rdb # Redis persistence file
+
+# Ruff
+.ruff_cache/
+
+# Mypy
+.mypy_cache/

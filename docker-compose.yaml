@@ -1,0 +1,91 @@
+services:
+  django_web:
+    build:
+      context: . # Build from the current directory (where Dockerfile is located)
+      dockerfile: Dockerfile
+    command: >
+      bash -c "
+        set -e;
+        python manage.py collectstatic --noinput;
+        python manage.py makemigrations;
+        python manage.py migrate;
+        gunicorn --bind 0.0.0.0:8000 --timeout 120 budget_management.wsgi:application;
+        "
+    volumes:
+      - .:/app # Mount the current directory into the container for live development
+    ports:
+      - "8000:8000" # Map host port 8000 to container port 8000
+    environment:
+      - REDIS_URL=redis://redis_service:6379/0
+      - DJANGO_SETTINGS_MODULE=budget_management.settings
+    depends_on:
+      postgres_db:
+        condition: service_healthy # Ensure the database service is healthy before starting Django
+      redis_service:
+        condition: service_started # Redis doesn't typically need a healthcheck for basic operation
+    env_file:
+      - .env # Load environment variables from a .env file (e.g., SECRET_KEY, DEBUG, DATABASE_URL)
+
+  # PostgreSQL database service
+  postgres_db:
+    image: postgres:13-alpine # Use a lightweight PostgreSQL image
+    volumes:
+      - pg_data:/var/lib/postgresql/data/ # Persistent volume for database data
+    env_file: # Added to load PostgreSQL credentials from .env
+      - .env
+    ports:
+      - "5432:5432" # Optional: Expose DB port if you need to access it from host (e.g., for external tools)
+    
+    healthcheck: # Added healthcheck for PostgreSQL readiness
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"] # Checks if DB is ready
+      interval: 5s # Check every 5 seconds
+      timeout: 5s # Timeout after 5 seconds if not ready
+      retries: 5 # Retry 5 times before marking as unhealthy
+      start_period: 10s # Give the DB 10 seconds to start up initially
+
+  # Redis cache and Celery broker service
+  redis_service:
+    image: redis:6-alpine # Use a lightweight Redis image
+    ports:
+      - "6379:6379" # Optional: Expose Redis port if you need to access it from host
+
+  # Celery worker service
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A budget_management worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis_service:6379/0
+      - DJANGO_SETTINGS_MODULE=budget_management.settings
+    depends_on:
+      redis_service:
+        condition: service_started
+      django_web:
+        condition: service_started # Assuming django_web starts successfully
+
+  # Celery Beat service for scheduling tasks
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A budget_management beat -l info --scheduler django_celery_beat.schedulers.DatabaseScheduler
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis_service:6379/0 
+      - DJANGO_SETTINGS_MODULE=budget_management.settings
+    depends_on:
+      redis_service:
+        condition: service_started
+      django_web:
+        condition: service_started # Assuming django_web starts successfully
+# Define named volumes for data persistence
+volumes:
+  pg_data: # Volume for PostgreSQL data
