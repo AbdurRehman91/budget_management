@@ -1,0 +1,14 @@
+At its core, this system manages ad spending and campaign activity through:
+Data: It track Brands (with daily/monthly budgets), Campaigns (linked to Brands, with activity status and schedules), 
+and Ad Impressions (each ad display event, costing money).
+Setup: You create Brands and Campaigns using the Django Admin. You can also view Ad Impressions there, though the system creates them automatically.
+Core Flow:
+    Impressions: When an ad is shown, your ad server sends a POST request to api/ads/record-impression/. 
+    This call updates the Brand's daily/monthly spend and instantly checks if the Campaign is still active (based on budget and time).
+    Campaign Status: Campaigns are automatically turned on/off if the Brand runs out of budget or 
+    if the current time is outside their scheduled "dayparting" hours.
+
+Background Tasks:
+    Daily Reset: Every day (midnight PKT), all Brands' daily spend resets to zero, reactivating eligible Campaigns.
+    Monthly Reset: On the first of every month (midnight PKT), all Brands' monthly spend resets to zero, also reactivating eligible Campaigns.
+    Frequent Check: Every few minutes, all Campaigns are re-evaluated to ensure their active status matches current budgets and time schedules.
